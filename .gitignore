@@ -1,5 +1,7 @@
 # Object files
 parse_csv
+tags
+TAGS
 *.o
 *.ko
 *.obj

@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I. -Wall
+CFLAGS=-I. -Wall -g
 DEPS = csv.h
 OBJ = libcsv.o main.o
 
@@ -12,3 +12,6 @@ parse_csv: $(OBJ)
 .PHONY: clean
 clean:
 	rm -rf ./*.o parse_csv
+
+valgrind: parse_csv
+	valgrind --leak-check=yes ./parse_csv ./accounting_sample.csv

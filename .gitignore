@@ -1,4 +1,5 @@
 # Object files
+parse_csv
 *.o
 *.ko
 *.obj

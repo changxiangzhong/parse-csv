@@ -6,10 +6,30 @@
 
 static const char DELIMITER = ';';
 
+typedef char (*column_name)[128];
+#define LINE_NAME_LEN 32
+typedef char (*line_name)[LINE_NAME_LEN];
+
 struct parse_context {
     int y; // line index
     int x; // column index
+    line_name ln_name;
+    column_name *cl_name;
+    size_t cl_name_len;
 };
+
+void init_parse_context(struct parse_context *context)
+{
+    context -> x = 0;
+    context -> y = 0;
+    context -> ln_name = calloc(sizeof(char), LINE_NAME_LEN);
+}
+
+void free_parse_context(struct parse_context *context)
+{
+    free(context -> ln_name);
+}
+
 /**
  * @buffer pointer to buffer
  * @return buffer size when @return >= 0, else error
@@ -30,7 +50,7 @@ long read_input(char** buffer)
     return fsize;
 }
 
-char* num_idx_2_char_idx(int num)
+char* to_alphabetic_column(int num)
 {
 #define RET_BUF_LEN 32
     static char ret[RET_BUF_LEN];
@@ -54,7 +74,7 @@ char* num_idx_2_char_idx(int num)
     return ret;
 }
 
-void release_input_buf(char* buffer)
+void free_input_buf(char* buffer)
 {
     free(buffer);
 }
@@ -62,10 +82,15 @@ void release_input_buf(char* buffer)
 void end_of_field_cb(void* buf, size_t len, void* context_data)
 {
     struct parse_context *context = (struct parse_context*) context_data;
-    printf(
-            "cell[%d][%s]=%*.*s\n", 
+    if (context -> x == 0)
+        strncpy((char*)context -> ln_name, buf, len);
+
+    else 
+        printf(
+            "@year=%s\tcell[%d][%s]=%*.*s\n", 
+            (char*)context -> ln_name,
             context -> y + 1, 
-            num_idx_2_char_idx(context -> x), 
+            to_alphabetic_column(context -> x), 
             (int)len, 
             (int)len, 
             (char*)buf
@@ -90,8 +115,7 @@ int main(const int argc, const char const* argv[])
     char* file_buf;
     long file_buf_len;
     struct parse_context context;
-    context.y = 0;
-    context.x = 0;
+    init_parse_context(&context);
    
     file_buf_len = read_input(&file_buf);
 
@@ -100,6 +124,8 @@ int main(const int argc, const char const* argv[])
     csv_parse(&parser, file_buf, file_buf_len, end_of_field_cb, end_of_record_cb, &context); 
     csv_free(&parser);
 
-    release_input_buf(file_buf);
+    free_input_buf(file_buf);
+
+    free_parse_context(&context);
     return 0;
 }

@@ -116,6 +116,19 @@ void free_input_buf(char* buffer)
 void end_of_field_cb(void* buf, size_t len, void* context_data)
 {
     struct parse_context *context = (struct parse_context*) context_data;
+    double value;
+    char *str, *endptr;
+    
+    str = calloc(sizeof(char), len + 1);
+    strncpy(str, buf, len);
+
+    value = strtof(str, &endptr);
+    printf("str = %lu, len = %d, endptr = %lu\n", (unsigned long) str, (int)len, (unsigned long) endptr);
+    if (len == 0) {
+    } else if (endptr == str + len) {// pointed to the end of the string. Conversion success
+    } else {
+        value = -1;
+    }
 
     if (context -> y == 0) {// Store the 1st column names
         if (context -> x >= context -> cl_name_cap) {// expand it if necessary 
@@ -130,18 +143,19 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
         strncpy((char*)context -> ln_name, buf, len);
     } else {
         printf(
-            "@year=%s\t@company=%s\tcell[%d][%s]=%*.*s\n", 
+            "@year=%s\t@company=%s\tcell[%d][%s]=%*.*s(%f)\n", 
             (char*)context -> ln_name,
             (char*)context->cl_names[context->x],
             context -> y + 1, 
             to_alphabetic_column(context -> x), 
             (int)len, 
             (int)len, 
-            (char*)buf
+            (char*)buf,
+            value
             );
     }
 
-    
+    free(str);
     context -> x++;
 }
 

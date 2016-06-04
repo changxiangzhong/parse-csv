@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <float.h>
+#include <stdbool.h>
 #include "sql_op.h"
 #include "csv.h"
 
@@ -159,6 +161,7 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
     char *str, *endptr;
     MYSQL_TIME time;
     MYSQL_BIND param[3];// For this case it's 3 params;
+    bool value_is_null = false;
     
     memset(param, 0, sizeof param);
 
@@ -169,8 +172,8 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
     printf("str = %lu, len = %d, endptr = %lu\n", (unsigned long) str, (int)len, (unsigned long) endptr);
     
     if (len == 0 || endptr != str + len) {// Either empty value OR conversion failure
-#define FIELD_VALUE_READ_FAILURE -1
-        value = FIELD_VALUE_READ_FAILURE;
+        value = -DBL_MAX;
+        value_is_null = true;
     }
 
     if (context -> y == 0) {// Store the 1st column names
@@ -198,11 +201,14 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
             );
 
         if (context -> y > 0) {
-            // TODO: examine if it's convertable 
+            char* company_name_ptr = (char*) context -> cl_names[context -> x];
+            bool is_company_name_null = strlen(company_name_ptr) == 0;
             param[0].buffer_type = MYSQL_TYPE_STRING;
-            param[0].buffer = context -> cl_names[context -> x];
-            param[0].buffer_length = strlen(context -> cl_names[context -> x]); 
+            param[0].buffer = company_name_ptr;
+            param[0].buffer_length = strlen(company_name_ptr);
+            param[0].is_null = (char*) &is_company_name_null;
 
+            // TODO: examine if it's convertable
             time.year = atoi((char*)context -> ln_name);
             time.month = 1;
             time.day = 1;
@@ -211,6 +217,10 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
 
             param[2].buffer_type = MYSQL_TYPE_DOUBLE;
             param[2].buffer = &value;
+            param[2].is_null = (char*) &value_is_null;
+
+            for (int i = 0; i < 3; i++) 
+                if (param[i].is_null != NULL && *param[i].is_null) goto quit_on_null;
 
             if (mysql_stmt_bind_param(context -> pstmt, param) != 0) {
                 fprintf(stderr, " mysql_stmt_bind_param() failed\n");
@@ -226,6 +236,7 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
         }
     }
 
+quit_on_null:
     free(str);
     context -> x++;
 }

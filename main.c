@@ -124,10 +124,10 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
 
     value = strtof(str, &endptr);
     printf("str = %lu, len = %d, endptr = %lu\n", (unsigned long) str, (int)len, (unsigned long) endptr);
-    if (len == 0) {
-    } else if (endptr == str + len) {// pointed to the end of the string. Conversion success
-    } else {
-        value = -1;
+    
+    if (len == 0 || endptr != str + len) {// Either empty value OR conversion failure
+#define FIELD_VALUE_READ_FAILURE -1
+        value = FIELD_VALUE_READ_FAILURE;
     }
 
     if (context -> y == 0) {// Store the 1st column names

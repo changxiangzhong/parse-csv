@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "sql_op.h"
 #include "csv.h"
 
 static const char DELIMITER = ';';
@@ -18,6 +19,9 @@ struct parse_context {
     column_name *cl_names;
     size_t cl_name_len;
     size_t cl_name_cap;
+    MYSQL *mysql;
+    MYSQL_STMT *pstmt;
+    MYSQL_BIND param[3];// For this case it's 3 params;
 };
 
 void init_parse_context(struct parse_context *context)
@@ -35,6 +39,31 @@ void init_parse_context(struct parse_context *context)
     for (; i < context -> cl_name_cap; i++) {
        context -> cl_names[i] = calloc(sizeof(char), COLUMN_NAME_LEN);
     }
+
+    context -> mysql = mysql_init(NULL);
+
+    if (context -> mysql == NULL) {
+        fprintf(stderr, "%s\n", mysql_error(context->mysql));
+        exit(1);
+    }
+
+    if (mysql_real_connect(context -> mysql, MYSQL_HOSTNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_SCHEMA, 0, NULL, 0) == NULL) {
+        goto mysql_init_error;
+    }
+
+    if (mysql_query(context -> mysql, MYSQL_DDL)) {
+        goto mysql_init_error;
+    }
+
+    if (mysql_autocommit(context -> mysql, 0)) {
+        goto mysql_init_error;
+    }
+
+    return;
+mysql_init_error:
+        fprintf(stderr, "%s\n", mysql_error(context->mysql));
+        mysql_close(context -> mysql);
+        exit(1);
 }
 
 void expand_parse_contet_1st_column(struct parse_context *context)
@@ -62,6 +91,8 @@ void free_parse_context(struct parse_context *context)
         free(context -> cl_names[i]);
     }
     free(context -> cl_names);
+    mysql_commit(context-> mysql);
+    mysql_close(context -> mysql);
 }
 
 /**

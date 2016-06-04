@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-I. -Wall -g
-DEPS = csv.h
+CFLAGS=-I. -Wall -g -std=c11 `mysql_config --cflags --libs`
+DEPS = csv.h sql_op.h
 OBJ = libcsv.o main.o
 
 %.o: %.c $(DEPS)

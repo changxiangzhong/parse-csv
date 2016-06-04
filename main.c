@@ -21,7 +21,6 @@ struct parse_context {
     size_t cl_name_cap;
     MYSQL *mysql;
     MYSQL_STMT *pstmt;
-    MYSQL_BIND param[3];// For this case it's 3 params;
 };
 
 void init_parse_context(struct parse_context *context)
@@ -51,11 +50,19 @@ void init_parse_context(struct parse_context *context)
         goto mysql_init_error;
     }
 
-    if (mysql_query(context -> mysql, MYSQL_DDL)) {
+    if (mysql_query(context -> mysql, MYSQL_CREATE_TABLE)) {
         goto mysql_init_error;
     }
 
     if (mysql_autocommit(context -> mysql, 0)) {
+        goto mysql_init_error;
+    }
+
+    if ((context -> pstmt = mysql_stmt_init(context -> mysql)) == NULL) {
+        goto mysql_init_error;
+    }
+
+    if (mysql_stmt_prepare(context -> pstmt, MYSQL_INSERT, strlen(MYSQL_INSERT)) != 0) {
         goto mysql_init_error;
     }
 
@@ -92,6 +99,7 @@ void free_parse_context(struct parse_context *context)
     }
     free(context -> cl_names);
     mysql_commit(context-> mysql);
+    mysql_stmt_close(context -> pstmt);
     mysql_close(context -> mysql);
 }
 
@@ -149,7 +157,11 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
     struct parse_context *context = (struct parse_context*) context_data;
     double value;
     char *str, *endptr;
+    MYSQL_TIME time;
+    MYSQL_BIND param[3];// For this case it's 3 params;
     
+    memset(param, 0, sizeof param);
+
     str = calloc(sizeof(char), len + 1);
     strncpy(str, buf, len);
 
@@ -176,7 +188,7 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
         printf(
             "@year=%s\t@company=%s\tcell[%d][%s]=%*.*s(%f)\n", 
             (char*)context -> ln_name,
-            (char*)context->cl_names[context->x],
+            (char*)context -> cl_names[context -> x],
             context -> y + 1, 
             to_alphabetic_column(context -> x), 
             (int)len, 
@@ -184,6 +196,34 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
             (char*)buf,
             value
             );
+
+        if (context -> y > 0) {
+            // TODO: examine if it's convertable 
+            param[0].buffer_type = MYSQL_TYPE_STRING;
+            param[0].buffer = context -> cl_names[context -> x];
+            param[0].buffer_length = MYSQL_COMPANY_NAME_LEN; 
+
+            time.year = atoi((char*)context -> ln_name);
+            time.month = 1;
+            time.day = 1;
+            param[1].buffer_type = MYSQL_TYPE_DATE;
+            param[1].buffer = &time;
+
+            param[2].buffer_type = MYSQL_TYPE_DOUBLE;
+            param[2].buffer = &value;
+
+            if (mysql_stmt_bind_param(context -> pstmt, param) != 0) {
+                fprintf(stderr, " mysql_stmt_bind_param() failed\n");
+                fprintf(stderr, " %s\n", mysql_stmt_error(context -> pstmt));
+                exit(0);
+            }
+
+            if (mysql_stmt_execute(context -> pstmt) != 0) {
+                fprintf(stderr, " mysql_stmt_execute(), 1 failed\n");
+                fprintf(stderr, " %s\n", mysql_stmt_error(context -> pstmt));
+                exit(0);
+            }
+        }
     }
 
     free(str);

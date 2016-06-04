@@ -201,7 +201,7 @@ void end_of_field_cb(void* buf, size_t len, void* context_data)
             // TODO: examine if it's convertable 
             param[0].buffer_type = MYSQL_TYPE_STRING;
             param[0].buffer = context -> cl_names[context -> x];
-            param[0].buffer_length = MYSQL_COMPANY_NAME_LEN; 
+            param[0].buffer_length = strlen(context -> cl_names[context -> x]); 
 
             time.year = atoi((char*)context -> ln_name);
             time.month = 1;
